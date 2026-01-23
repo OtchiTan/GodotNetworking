@@ -18,7 +18,7 @@ def generate_gdextension_file(target, source, env):
     # configuration
     output_dir = target[0].dir.get_abspath()
     file_name = "network.gdextension"
-    entry_symbol = "gameplay_network_init"
+    entry_symbol = "network_library_init"
     lib_name = "libnetwork"
     
     output_path = os.path.join(output_dir, file_name)
