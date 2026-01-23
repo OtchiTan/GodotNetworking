@@ -1,0 +1,90 @@
+name: Smoke Test (Release)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  smoke-test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x86_64
+            # Linux dependencies
+            install_deps: |
+              sudo apt-get update
+              sudo apt-get install -y build-essential pkg-config libx11-dev libxcursor-dev libxinerama-dev libgl1-mesa-dev libglu-dev libasound2-dev libpulse-dev libudev-dev
+
+          - os: windows-latest
+            platform: windows
+            arch: x86_64
+            install_deps: echo "Windows deps pre-installed"
+
+          - os: macos-latest
+            platform: macos
+            arch: arm64
+            install_deps: echo "MacOS deps pre-installed"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install SCons
+        run: pip install scons
+
+      - name: Install Dependencies
+        run: ${{ matrix.install_deps }}
+
+      # --- Build GDExtensions (Release) ---
+      - name: Build GDExtensions (Release)
+        working-directory: src
+        run: |
+          scons platform=${{ matrix.platform }} arch=${{ matrix.arch }} target=template_release -j4
+      
+      # --- Build Engine (Release Template) ---
+      - name: Build Godot Engine (Release)
+        working-directory: engine
+        run: |
+          scons platform=${{ matrix.platform }} arch=${{ matrix.arch }} target=template_release -j4
+
+      # --- The Smoke Test ---
+      # We run the engine pointing to the 'game/' folder.
+      # --headless: No window (required for CI)
+      # --quit: Close immediately after initialization (if successful)
+      - name: Run Smoke Test
+        shell: bash
+        run: |
+          echo "🔥 Starting Smoke Test..."
+          
+          # Define executable paths based on OS
+          if [ "${{ matrix.platform }}" == "windows" ]; then
+            BIN="./engine/bin/godot.windows.template_release.x86_64.exe"
+          elif [ "${{ matrix.platform }}" == "macos" ]; then
+            # macOS template build creates a binary, not a .app bundle by default
+            BIN="./engine/bin/godot.macos.template_release.arm64"
+            chmod +x $BIN
+          else
+            BIN="./engine/bin/godot.linux.template_release.x86_64"
+            chmod +x $BIN
+          fi
+
+          echo "Running: $BIN"
+          
+          # Run the game!
+          # If GDExtensions fail to load, Godot usually returns a non-zero exit code here.
+          $BIN --headless --path game/ --quit
+          
+          echo "✅ Smoke Test Passed: Game initialized and exited cleanly."
