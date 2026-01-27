@@ -1,6 +1,6 @@
 [configuration]
 entry_symbol = "network_library_init"
-compatibility_minimum = "4.2"
+compatibility_minimum = "4.6"
 
 [libraries]
 macos.debug = "res://bin/libnetwork.macos.template_debug.arm64.dylib"

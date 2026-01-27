@@ -25,7 +25,7 @@ def generate_gdextension_file(target, source, env):
     
     content = f"""[configuration]
 entry_symbol = "{entry_symbol}"
-compatibility_minimum = "4.2"
+compatibility_minimum = "4.6"
 
 [libraries]
 macos.debug = "res://bin/{lib_name}.macos.template_debug.arm64.dylib"
