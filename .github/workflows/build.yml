@@ -50,6 +50,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config libx11-dev libxcursor-dev libxinerama-dev libgl1-mesa-dev libglu-dev libasound2-dev libpulse-dev
 
+      - name: Install D3D12 SDK (Windows Only)
+        if: matrix.platform == 'windows'
+        working-directory: engine
+        run: |
+          python misc/scripts/install_d3d12_sdk_windows.py
+          
       # Compile GDExtensions
       - name: Compile GDExtensions
         working-directory: src
@@ -72,7 +78,7 @@ jobs:
         with:
           path: engine/bin
           # Key includes OS, Arch, and the specific commit of the engine submodule
-          key: godot-engine-release-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.engine-hash.outputs.hash }}
+          key: godot-engine-release-v2-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.engine-hash.outputs.hash }}
 
       # --- Build Engine (Only on Cache Miss) ---
       - name: Build Godot Engine (Release Template)
@@ -80,7 +86,7 @@ jobs:
         working-directory: engine
         run: |
           echo "⚠️ Cache Miss! Building Engine from source..."
-          scons platform=${{ matrix.platform }} arch=${{ matrix.arch }} target=template_release -j4
+          scons platform=${{ matrix.platform }} arch=${{ matrix.arch }} target=template_release disable_path_overrides=no -j4
 
       # --- The Smoke Test ---
       - name: Run Smoke Test
