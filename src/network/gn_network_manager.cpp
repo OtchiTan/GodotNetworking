@@ -28,6 +28,11 @@ void godot::GDNetworkManager::close_socket()
     }
 }
 
+void godot::GDNetworkManager::send_data(const PackedByteArray &data)
+{
+    _send_message(MSG_DATA, data);
+}
+
 void godot::GDNetworkManager::on_state_timeout()
 {
     switch (current_state)
@@ -45,7 +50,7 @@ void godot::GDNetworkManager::on_state_timeout()
         if (!_is_ping_sent)
             _send_ping();
         else
-            close_socket();
+            set_state(NOT_CONNECTED);
         break;
     default:
         break;
@@ -73,11 +78,11 @@ void godot::GDNetworkManager::_parse_packet(char sender_ip[INET_ADDRSTRLEN], int
     switch (message_type)
     {
     case MSG_HELO:
-        UtilityFunctions::print("Helo");
+        UtilityFunctions::print("Receive Helo");
         set_state(CONNECTING);
         break;
     case MSG_HSK:
-        UtilityFunctions::print("Handshake");
+        UtilityFunctions::print("Receive Handshake");
         set_state(CONNECTED);
         break;
     case MSG_PING:
@@ -93,10 +98,10 @@ void godot::GDNetworkManager::_parse_packet(char sender_ip[INET_ADDRSTRLEN], int
 
 void GDNetworkManager::_bind_methods()
 {
-    ClassDB::bind_method(D_METHOD("poll"), &GDNetworkManager::poll);
     ClassDB::bind_method(D_METHOD("close_socket"), &GDNetworkManager::close_socket);
     ClassDB::bind_method(D_METHOD("connect_socket"), &GDNetworkManager::connect_socket);
     ClassDB::bind_method(D_METHOD("on_state_timeout"), &GDNetworkManager::on_state_timeout);
+    ClassDB::bind_method(D_METHOD("send_data"), &GDNetworkManager::send_data);
 
     ADD_SIGNAL(MethodInfo("packet_received",
                           PropertyInfo(Variant::STRING, "sender_ip"),
@@ -167,12 +172,14 @@ bool godot::GDNetworkManager::_bind_port(int port)
 void godot::GDNetworkManager::_send_helo()
 {
     PackedByteArray data;
+    UtilityFunctions::print("Send Helo");
     _send_message(MSG_HELO, data);
 }
 
 void godot::GDNetworkManager::_send_hsk()
 {
     PackedByteArray data;
+    UtilityFunctions::print("Send hsk");
     _send_message(MSG_HSK, data);
 }
 

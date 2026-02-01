@@ -272,6 +272,7 @@ autoplay = &"move"
 position = Vector2(592, 65)
 
 [node name="GDNetworkManager" type="GDNetworkManager" parent="." unique_id=1785046915]
+unique_name_in_owner = true
 script = ExtResource("9_0tnpc")
 
 [node name="Timer" type="Timer" parent="GDNetworkManager" unique_id=784010075]

@@ -129,6 +129,7 @@ namespace godot
 
         // Internal helper to close socket safely on all platforms
         void close_socket();
+        void send_data(const PackedByteArray &data);
 
         void on_state_timeout();
 
