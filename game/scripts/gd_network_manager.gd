@@ -6,15 +6,8 @@ extends GDNetworkManager
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	var args = OS.get_cmdline_args()
-	var is_server = false
-	for arg in args:
-		if arg == "--server":
-			is_server = true
-	if (is_server): 
-		if (start_server(port)):
-			print("Network Manager")
-	else:
-		connect_socket("127.0.0.1", port)
+	
+	connect_socket("127.0.0.1", port)
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:

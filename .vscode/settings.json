@@ -3,5 +3,6 @@
         "--compile-commands-dir=${workspaceFolder}/src",
         "--query-driver=/usr/bin/clang++"
     ],
-    "dotnet.defaultSolution": "disable"
+    "dotnet.defaultSolution": "disable",
+    "cmake.ignoreCMakeListsMissing": true
 }
