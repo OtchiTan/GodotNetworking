@@ -6,8 +6,7 @@
             "type": "shell",
             "command": "scons",
             "args": [
-                "platform=macos",
-                "arch=arm64",
+                "platform=windows",
                 "target=template_debug",
                 "dev_build=yes",
                 "debug_symbols=yes",

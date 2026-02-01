@@ -1,5 +1,0 @@
-[gd_scene format=3 uid="uid://bfj02d6t245ji"]
-
-[node name="Main" type="Node" unique_id=462397334]
-
-[node name="GDNetworkManager" type="GDNetworkManager" parent="." unique_id=1274457594]

@@ -148,3 +148,6 @@ compile_commands.json
 
 # Godot Imports (Never commit these)
 game/.godot/
+
+*.ilk
+*.pdb
