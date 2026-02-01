@@ -284,5 +284,10 @@ text = "Space to jump"
 [node name="GDNetworkManager" type="GDNetworkManager" parent="." unique_id=1785046915]
 script = ExtResource("9_0tnpc")
 
+[node name="Timer" type="Timer" parent="GDNetworkManager" unique_id=784010075]
+wait_time = 2.0
+autostart = true
+
 [connection signal="tree_exiting" from="." to="GDNetworkManager" method="_on_game_tree_exiting"]
 [connection signal="packet_received" from="GDNetworkManager" to="GDNetworkManager" method="_on_packet_received"]
+[connection signal="timeout" from="GDNetworkManager/Timer" to="GDNetworkManager" method="_on_timer_timeout"]

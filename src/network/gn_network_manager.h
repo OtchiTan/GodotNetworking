@@ -35,7 +35,7 @@ namespace godot
     {
         MSG_HELO = 0,
         MSG_HSK = 1,
-        MSG_PING = 2
+        MSG_PING = 2,
     };
 
     struct GD_WSASockInitializer
@@ -86,7 +86,29 @@ namespace godot
         std::vector<GDReplicatedNode> replicated_nodes;
 
         NetworkState current_state = NOT_CONNECTED;
-    void set_state(NetworkState p_state);
+        void set_state(NetworkState p_state);
+
+        void _parse_packet(char sender_ip[INET_ADDRSTRLEN], int sender_port, const PackedByteArray &data);
+        void _send_packet(String ip, int port, const PackedByteArray &data);
+
+        void _send_message(String ip, int port, MessageType message_type, const PackedByteArray &data);
+
+        String _server_ip{"127.0.0.1"};
+        int _server_port = 3630;
+
+        bool _has_authority = false;
+        // Bind to a port to receive data (Server or P2P Peer)
+        bool _bind_port(int port);
+        void _send_helo();
+        void _send_helo(String ip, int port);
+        void _send_hsk();
+        void _send_hsk(String ip, int port);
+        bool _is_ping_sent = false;
+        void _send_ping();
+        void _send_pong(String ip, int port);
+
+        float _time_since_last_data = 0.f;
+
     protected:
         static void _bind_methods();
 
@@ -96,16 +118,17 @@ namespace godot
 
         void _process(double delta) override;
         void _ready() override;
+        void _notification(int p_what);
 
-        // Bind to a port to receive data (Server or P2P Peer)
-        bool bind_port(int port);
+        bool start_server(int port);
 
         // Send a packet to a specific IP/Port
-        void send_packet(String ip, int port, PackedByteArray data);
         void connect_socket(String ip, int port);
 
         // Internal helper to close socket safely on all platforms
         void close_socket();
+
+        void on_state_timeout();
 
         // Check for incoming packets (Call this in _process)
         void poll();

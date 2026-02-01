@@ -16,8 +16,11 @@ void godot::GDNetworkManager::_set_non_blocking(socket_t sock)
 
 void godot::GDNetworkManager::close_socket()
 {
+    UtilityFunctions::print("Disconnect");
+    set_state(NOT_CONNECTED);
     if (udp_socket != INVALID_SOCKET)
     {
+        _has_authority = false;
 #ifdef _WIN32
         closesocket(udp_socket);
 #else
@@ -26,20 +29,103 @@ void godot::GDNetworkManager::close_socket()
     }
 }
 
+void godot::GDNetworkManager::on_state_timeout()
+{
+    if (_has_authority)
+        return;
+
+    switch (current_state)
+    {
+    case NOT_CONNECTED:
+        _send_helo();
+        break;
+    case CONNECTING:
+        _send_hsk();
+        break;
+    case CONNECTED:
+        UtilityFunctions::print("Connected");
+        break;
+    case SPURIOUS:
+        if (!_is_ping_sent)
+            _send_ping();
+        else
+            close_socket();
+        break;
+    default:
+        break;
+    }
+}
+
 void godot::GDNetworkManager::set_state(NetworkState p_state)
 {
     if (current_state == p_state)
         return;
     current_state = p_state;
-    UtilityFunctions::print("Network State Changed: ", p_state);
+    _is_ping_sent = false;
+    on_state_timeout();
+    switch (current_state)
+    {
+    case NOT_CONNECTED:
+        UtilityFunctions::print("Network State Changed: NOT_CONNECTED");
+        break;
+    case CONNECTING:
+        UtilityFunctions::print("Network State Changed: CONNECTING");
+        break;
+    case CONNECTED:
+        UtilityFunctions::print("Network State Changed: CONNECTED");
+        break;
+    case SPURIOUS:
+        UtilityFunctions::print("Network State Changed: SPURIOUS");
+        break;
+    default:
+        break;
+    }
+}
+
+void godot::GDNetworkManager::_parse_packet(char sender_ip[INET_ADDRSTRLEN], int sender_port, const PackedByteArray &data)
+{
+    emit_signal("packet_received", String(sender_ip), sender_port, data);
+
+    if (!_has_authority)
+        _time_since_last_data = 0.f;
+
+    MessageType message_type = (MessageType)data[0];
+    PackedByteArray data_to_send;
+    switch (message_type)
+    {
+    case MSG_HELO:
+        UtilityFunctions::print("Helo");
+        if (_has_authority)
+            _send_helo(sender_ip, sender_port);
+        else
+            set_state(CONNECTING);
+        break;
+    case MSG_HSK:
+        UtilityFunctions::print("Handshake");
+        if (_has_authority)
+            _send_hsk(sender_ip, sender_port);
+        else
+            set_state(CONNECTED);
+        break;
+    case MSG_PING:
+        if (_has_authority)
+            _send_pong(sender_ip, sender_port);
+        else
+            set_state(CONNECTED);
+        break;
+    default:
+        UtilityFunctions::print("Unrecognized packet");
+        break;
+    }
 }
 
 void GDNetworkManager::_bind_methods()
 {
-    ClassDB::bind_method(D_METHOD("bind_port", "port"), &GDNetworkManager::bind_port);
-    ClassDB::bind_method(D_METHOD("send_packet", "ip", "port", "data"), &GDNetworkManager::send_packet);
+    ClassDB::bind_method(D_METHOD("start_server", "port"), &GDNetworkManager::start_server);
     ClassDB::bind_method(D_METHOD("poll"), &GDNetworkManager::poll);
     ClassDB::bind_method(D_METHOD("close_socket"), &GDNetworkManager::close_socket);
+    ClassDB::bind_method(D_METHOD("connect_socket"), &GDNetworkManager::connect_socket);
+    ClassDB::bind_method(D_METHOD("on_state_timeout"), &GDNetworkManager::on_state_timeout);
 
     ADD_SIGNAL(MethodInfo("packet_received",
                           PropertyInfo(Variant::STRING, "sender_ip"),
@@ -62,13 +148,29 @@ GDNetworkManager::~GDNetworkManager()
 
 void GDNetworkManager::_process(double delta)
 {
+    if (current_state == CONNECTED)
+    {
+        _time_since_last_data += delta;
+        if (_time_since_last_data > 0.1f)
+        {
+            set_state(SPURIOUS);
+            _send_ping();
+        }
+    }
+    poll();
 }
 
 void godot::GDNetworkManager::_ready()
 {
 }
 
-bool godot::GDNetworkManager::bind_port(int port)
+bool godot::GDNetworkManager::start_server(int port)
+{
+    _has_authority = true;
+    return _bind_port(port);
+}
+
+bool godot::GDNetworkManager::_bind_port(int port)
 {
     UtilityFunctions::print("Start socket to port : " + port);
     close_socket();
@@ -97,7 +199,44 @@ bool godot::GDNetworkManager::bind_port(int port)
     return true;
 }
 
-void godot::GDNetworkManager::send_packet(String ip, int port, PackedByteArray data)
+void godot::GDNetworkManager::_send_helo()
+{
+    _send_helo(_server_ip, _server_port);
+}
+
+void godot::GDNetworkManager::_send_helo(String ip, int port)
+{
+    PackedByteArray data;
+    _send_message(ip, port, MSG_HELO, data);
+    UtilityFunctions::print("Send Helo");
+}
+
+void godot::GDNetworkManager::_send_hsk()
+{
+    _send_hsk(_server_ip, _server_port);
+}
+
+void godot::GDNetworkManager::_send_hsk(String ip, int port)
+{
+    PackedByteArray data;
+    _send_message(ip, port, MSG_HSK, data);
+    UtilityFunctions::print("Send Hsk");
+}
+
+void godot::GDNetworkManager::_send_ping()
+{
+    _is_ping_sent = true;
+    PackedByteArray data;
+    _send_message(_server_ip, _server_port, MSG_PING, data);
+}
+
+void godot::GDNetworkManager::_send_pong(String ip, int port)
+{
+    PackedByteArray data;
+    _send_message(ip, port, MSG_PING, data);
+}
+
+void godot::GDNetworkManager::_send_packet(String ip, int port, const PackedByteArray &data)
 {
     if (udp_socket == INVALID_SOCKET)
     {
@@ -118,8 +257,22 @@ void godot::GDNetworkManager::send_packet(String ip, int port, PackedByteArray d
     }
 }
 
+void godot::GDNetworkManager::_send_message(String ip, int port, MessageType message_type, const PackedByteArray &data)
+{
+    PackedByteArray total_data;
+    total_data.append(message_type);
+    total_data.append(ObjectID());
+    total_data.append_array(data);
+
+    _send_packet(ip, port, total_data);
+}
+
 void godot::GDNetworkManager::connect_socket(String ip, int port)
 {
+    _bind_port(0);
+    _server_ip = ip;
+    _server_port = port;
+    _send_helo();
 }
 
 void godot::GDNetworkManager::poll()
@@ -148,6 +301,19 @@ void godot::GDNetworkManager::poll()
         inet_ntop(AF_INET, &sender_addr.sin_addr, sender_ip, INET_ADDRSTRLEN);
         int sender_port = ntohs(sender_addr.sin_port);
 
-        emit_signal("packet_received", String(sender_ip), sender_port, received_data);
+        _parse_packet(sender_ip, sender_port, received_data);
+    }
+}
+
+void godot::GDNetworkManager::_notification(int p_what)
+{
+    switch (p_what)
+    {
+    case NOTIFICATION_READY:
+        _ready();
+        break;
+    case NOTIFICATION_PROCESS:
+        _process(get_process_delta_time());
+        break;
     }
 }
