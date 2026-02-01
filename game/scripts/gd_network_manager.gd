@@ -1,6 +1,7 @@
 extends GDNetworkManager
 
 @export var port = 3630
+@onready var server_state_label: Label = $ServerStateLabel
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -30,3 +31,15 @@ func _on_game_tree_exiting() -> void:
 
 func _on_timer_timeout() -> void:
 	on_state_timeout()
+
+
+func _on_network_state_chanded(current_state: int) -> void:
+	match current_state:
+		0:
+			server_state_label.text = "Not Connected"
+		1:
+			server_state_label.text = "Connecting"
+		2:
+			server_state_label.text = "Connected"
+		3:
+			server_state_label.text = "Spurious"

@@ -36,6 +36,7 @@ namespace godot
         MSG_HELO = 0,
         MSG_HSK = 1,
         MSG_PING = 2,
+        MSG_DATA = 3,
     };
 
     struct GD_WSASockInitializer
@@ -74,6 +75,13 @@ namespace godot
         }
     };
 
+    struct GDConnectedSocket
+    {
+        ObjectID user_id;
+        String ip;
+        int port;
+    };
+
     class GDNetworkManager : public Node
     {
         GDCLASS(GDNetworkManager, Node)
@@ -106,6 +114,11 @@ namespace godot
         bool _is_ping_sent = false;
         void _send_ping();
         void _send_pong(String ip, int port);
+
+        void _replicate_data(String ip, int port);
+
+        void _register_client(ObjectID id, String ip, int port);
+        std::vector<GDConnectedSocket> _connected_sockets;
 
         float _time_since_last_data = 0.f;
 

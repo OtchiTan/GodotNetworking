@@ -63,23 +63,7 @@ void godot::GDNetworkManager::set_state(NetworkState p_state)
     current_state = p_state;
     _is_ping_sent = false;
     on_state_timeout();
-    switch (current_state)
-    {
-    case NOT_CONNECTED:
-        UtilityFunctions::print("Network State Changed: NOT_CONNECTED");
-        break;
-    case CONNECTING:
-        UtilityFunctions::print("Network State Changed: CONNECTING");
-        break;
-    case CONNECTED:
-        UtilityFunctions::print("Network State Changed: CONNECTED");
-        break;
-    case SPURIOUS:
-        UtilityFunctions::print("Network State Changed: SPURIOUS");
-        break;
-    default:
-        break;
-    }
+    emit_signal("network_state_chanded", current_state);
 }
 
 void godot::GDNetworkManager::_parse_packet(char sender_ip[INET_ADDRSTRLEN], int sender_port, const PackedByteArray &data)
@@ -103,7 +87,10 @@ void godot::GDNetworkManager::_parse_packet(char sender_ip[INET_ADDRSTRLEN], int
     case MSG_HSK:
         UtilityFunctions::print("Handshake");
         if (_has_authority)
+        {
+            _register_client(ObjectID(), sender_ip, sender_port);
             _send_hsk(sender_ip, sender_port);
+        }
         else
             set_state(CONNECTED);
         break;
@@ -112,6 +99,8 @@ void godot::GDNetworkManager::_parse_packet(char sender_ip[INET_ADDRSTRLEN], int
             _send_pong(sender_ip, sender_port);
         else
             set_state(CONNECTED);
+        break;
+    case MSG_DATA:
         break;
     default:
         UtilityFunctions::print("Unrecognized packet");
@@ -131,6 +120,7 @@ void GDNetworkManager::_bind_methods()
                           PropertyInfo(Variant::STRING, "sender_ip"),
                           PropertyInfo(Variant::INT, "sender_port"),
                           PropertyInfo(Variant::PACKED_BYTE_ARRAY, "data")));
+    ADD_SIGNAL(MethodInfo("network_state_chanded", PropertyInfo(Variant::INT, "current_state")));
 }
 
 GDNetworkManager::GDNetworkManager()
@@ -148,10 +138,17 @@ GDNetworkManager::~GDNetworkManager()
 
 void GDNetworkManager::_process(double delta)
 {
-    if (current_state == CONNECTED)
+    if (_has_authority)
+    {
+        for (const GDConnectedSocket &socket : _connected_sockets)
+        {
+            _replicate_data(socket.ip, socket.port);
+        }
+    }
+    else if (current_state == CONNECTED)
     {
         _time_since_last_data += delta;
-        if (_time_since_last_data > 0.1f)
+        if (_time_since_last_data > 2.f)
         {
             set_state(SPURIOUS);
             _send_ping();
@@ -172,7 +169,6 @@ bool godot::GDNetworkManager::start_server(int port)
 
 bool godot::GDNetworkManager::_bind_port(int port)
 {
-    UtilityFunctions::print("Start socket to port : " + port);
     close_socket();
 
     udp_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -208,7 +204,6 @@ void godot::GDNetworkManager::_send_helo(String ip, int port)
 {
     PackedByteArray data;
     _send_message(ip, port, MSG_HELO, data);
-    UtilityFunctions::print("Send Helo");
 }
 
 void godot::GDNetworkManager::_send_hsk()
@@ -220,7 +215,6 @@ void godot::GDNetworkManager::_send_hsk(String ip, int port)
 {
     PackedByteArray data;
     _send_message(ip, port, MSG_HSK, data);
-    UtilityFunctions::print("Send Hsk");
 }
 
 void godot::GDNetworkManager::_send_ping()
@@ -234,6 +228,23 @@ void godot::GDNetworkManager::_send_pong(String ip, int port)
 {
     PackedByteArray data;
     _send_message(ip, port, MSG_PING, data);
+}
+
+void godot::GDNetworkManager::_replicate_data(String ip, int port)
+{
+    if (!_has_authority)
+        return;
+    PackedByteArray data;
+    _send_message(ip, port, MSG_DATA, data);
+}
+
+void godot::GDNetworkManager::_register_client(ObjectID id, String ip, int port)
+{
+    GDConnectedSocket client_socket = GDConnectedSocket();
+    client_socket.user_id = ObjectID();
+    client_socket.ip = ip;
+    client_socket.port = port;
+    _connected_sockets.push_back(client_socket);
 }
 
 void godot::GDNetworkManager::_send_packet(String ip, int port, const PackedByteArray &data)
