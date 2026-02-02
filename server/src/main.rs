@@ -8,10 +8,15 @@ fn main() -> std::io::Result<()> {
 
     match network_manager {
         Ok(network_manager) => loop {
-            network_manager.recv().expect("Error Message received");
+            match network_manager.recv() {
+                Ok(_) => {}
+                Err(_e) => {
+                    println!("{}", _e);
+                }
+            }
         },
-        Err(_) => {
-            println!("network_manager crashed");
+        Err(_e) => {
+            println!("{}", _e);
             Ok(())
         }
     }

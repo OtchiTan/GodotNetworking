@@ -113,6 +113,8 @@ namespace godot
 
         float _time_since_last_data = 0.f;
 
+        ObjectID _generate_id();
+
     protected:
         static void _bind_methods();
 

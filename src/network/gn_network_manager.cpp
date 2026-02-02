@@ -1,5 +1,8 @@
+#define NOMINMAX
+
 #include "gn_network_manager.h"
 #include <godot_cpp/core/class_db.hpp>
+#include <random>
 
 using namespace godot;
 
@@ -94,6 +97,18 @@ void godot::GDNetworkManager::_parse_packet(char sender_ip[INET_ADDRSTRLEN], int
         UtilityFunctions::print("Unrecognized packet");
         break;
     }
+}
+
+ObjectID godot::GDNetworkManager::_generate_id()
+{
+    std::random_device rd;
+    std::mt19937_64 eng(rd());
+
+    std::uniform_int_distribution<uint64_t> distr(
+        std::numeric_limits<uint64_t>::min(),
+        std::numeric_limits<uint64_t>::max());
+
+    return ObjectID(distr(eng));
 }
 
 void GDNetworkManager::_bind_methods()
@@ -214,9 +229,10 @@ void godot::GDNetworkManager::_send_packet(const PackedByteArray &data)
 void godot::GDNetworkManager::_send_message(MessageType message_type, const PackedByteArray &data)
 {
     PackedByteArray total_data;
-    total_data.append(message_type);
-    total_data.append(ObjectID());
-    total_data.append_array(data);
+    total_data.push_back(message_type);
+    ObjectID object_id = _generate_id();
+    total_data.push_back(object_id);
+    // total_data.append_array(data);
 
     _send_packet(total_data);
 }

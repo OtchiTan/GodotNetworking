@@ -1,5 +1,6 @@
 use crate::message_type::MessageType;
 use std::io;
+use std::io::ErrorKind;
 use std::net::{SocketAddr, UdpSocket};
 use std::str;
 
@@ -13,7 +14,10 @@ impl NetworkManager {
         println!("UDP server started on {}", addr);
 
         match socket {
-            Ok(socket) => Ok(Self { socket }),
+            Ok(socket) => {
+                socket.set_nonblocking(true)?;
+                Ok(Self { socket })
+            }
             Err(error) => Err(io::Error::new(io::ErrorKind::Other, error)),
         }
     }
@@ -65,20 +69,27 @@ impl NetworkManager {
 
     pub fn recv(&self) -> io::Result<()> {
         let mut buf = [0u8; 1500];
-        let (amt, src) = self.socket.recv_from(&mut buf)?;
 
-        let buf = &mut buf[..amt];
+        match self.socket.recv_from(&mut buf) {
+            Ok((received_bytes, sender_addr)) => {
+                let buf = &mut buf[..received_bytes];
 
-        let parsed_message = MessageType::try_from(buf[0]);
-        match parsed_message {
-            Ok(v) => match v {
-                MessageType::Helo => Self::handle_helo(self, src),
-                MessageType::Hsk => Self::handle_hsk(self, src),
-                MessageType::Ping => Self::handle_ping(self, src),
-                MessageType::Data => Self::handle_data(self, src, buf),
-            },
-            Err(err) => {
-                println!("Error: {:?}", err);
+                let parsed_message = MessageType::try_from(buf[0]);
+                match parsed_message {
+                    Ok(v) => match v {
+                        MessageType::Helo => Self::handle_helo(self, sender_addr),
+                        MessageType::Hsk => Self::handle_hsk(self, sender_addr),
+                        MessageType::Ping => Self::handle_ping(self, sender_addr),
+                        MessageType::Data => Self::handle_data(self, sender_addr, buf),
+                    },
+                    Err(err) => {
+                        println!("Error: {:?}", err);
+                    }
+                }
+            }
+            Err(ref e) if e.kind() == ErrorKind::WouldBlock => {}
+            Err(e) => {
+                eprintln!("An error occurred: {}", e);
             }
         }
         Ok(())
